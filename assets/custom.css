@@ -1,0 +1,306 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-color: #282c40;
+    --card-bg: #3d425b;
+    --sidebar-bg: #32374e;
+    --accent-blue: #3b82f6;
+    --accent-indigo: #818cf8;
+    --accent-cyan: #22d3ee;
+    --text-primary: #ffffff;
+    --text-secondary: #8f9bb3;
+    --border-color: rgba(255, 255, 255, 0.15);
+    --input-bg: #1e2230;
+    --glow-color: rgba(129, 140, 248, 0.4);
+}
+
+body {
+    background-color: var(--bg-color);
+    background-image: 
+        radial-gradient(at 0% 0%, rgba(97, 58, 102, 0.15) 0px, transparent 60%),
+        radial-gradient(at 100% 100%, rgba(81, 117, 122, 0.12) 0px, transparent 60%),
+        radial-gradient(at 50% 100%, rgba(115, 90, 48, 0.1) 0px, transparent 60%);
+    background-attachment: fixed;
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+::-webkit-scrollbar-thumb {
+    background: #1e2230;
+    border: 2px solid var(--bg-color);
+    border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* Header */
+.custom-header {
+    background: rgba(50, 55, 78, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: 70px;
+    padding: 0 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.header-title {
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+    background: linear-gradient(135deg, #ffffff, #8f9bb3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+/* Inputs and Buttons */
+.custom-input {
+    background-color: var(--input-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: 8px !important;
+    padding: 10px 16px !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s ease-in-out !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.15) !important;
+}
+
+.custom-input:focus {
+    border-color: var(--accent-indigo) !important;
+    box-shadow: 0 0 0 3px var(--glow-color) !important;
+    outline: none !important;
+}
+
+/* High Contrast Input Placeholder */
+.custom-input::placeholder {
+    color: #94a3b8 !important;
+    opacity: 0.8 !important;
+}
+
+.custom-btn {
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-blue)) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.custom-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25) !important;
+    filter: brightness(1.1);
+}
+
+/* Sidebar Navigation */
+.custom-sidebar {
+    background: rgba(50, 55, 78, 0.5) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color) !important;
+    border-radius: 16px !important;
+    padding: 20px !important;
+    margin-bottom: 24px;
+}
+
+.custom-sidebar .nav-link {
+    color: #cbd5e1 !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    margin-bottom: 6px !important;
+    transition: all 0.2s ease !important;
+    border: 1px solid transparent;
+}
+
+.custom-sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.custom-sidebar .nav-link.active {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-left: 4px solid var(--accent-indigo) !important;
+    border-radius: 4px 8px 8px 4px !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
+
+/* Autocomplete Floating list */
+.custom-autocomplete {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+    padding: 4px !important;
+}
+
+.custom-autocomplete .list-group-item {
+    background-color: transparent !important;
+    border: none !important;
+    color: var(--text-secondary) !important;
+    border-radius: 6px !important;
+    padding: 10px 14px !important;
+    font-size: 0.85rem !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+
+.custom-autocomplete .list-group-item:hover {
+    background-color: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+.custom-autocomplete .list-group-item.disabled {
+    color: #64748b !important;
+}
+
+/* Custom Cards */
+.custom-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    margin-bottom: 24px;
+}
+
+.card-title {
+    font-weight: 700;
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+.card-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+}
+
+/* Form Controls (Switches and Dropdowns) */
+.form-check-input {
+    background-color: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23cbd5e1'/%3e%3c/svg%3e") !important;
+    cursor: pointer !important;
+}
+
+.form-check-input:checked {
+    background-color: var(--accent-indigo) !important;
+    border-color: var(--accent-indigo) !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+}
+
+.form-check-label {
+    color: var(--text-primary) !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+}
+
+/* Select Dropdown override */
+.Select-control {
+    background-color: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+}
+
+.Select-value-label, .Select-placeholder, .Select-input {
+    color: var(--text-primary) !important;
+}
+
+.Select-menu-outer {
+    background-color: var(--card-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.VirtualizedSelectOption {
+    background-color: transparent !important;
+    color: var(--text-secondary) !important;
+}
+
+.VirtualizedSelectFocusedOption {
+    background-color: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Dropdown override for Dash dcc.Dropdown */
+.dash-dropdown .Select-control {
+    background-color: var(--input-bg) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.dash-dropdown .Select--multi .Select-value {
+    background-color: var(--bg-color) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: 4px !important;
+}
+
+.dash-dropdown .Select--multi .Select-value-icon {
+    border-right: 1px solid var(--border-color) !important;
+    color: #ef4444 !important;
+}
+
+.dash-dropdown .Select--multi .Select-value-icon:hover {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Grid layout adjustments */
+.main-row {
+    padding: 0 24px;
+    max-width: 100%;
+}
+
+/* Typography styles */
+.highlight-text {
+    color: var(--accent-cyan);
+    font-weight: 600;
+}
+
+.desc-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.badge-info {
+    background-color: rgba(99, 102, 241, 0.2) !important;
+    color: #c7d2fe !important;
+    border: 1px solid rgba(99, 102, 241, 0.4) !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+}

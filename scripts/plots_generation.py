@@ -3,70 +3,117 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import math
 
-def create_localization_plot(localization_data, all_transcripts):  
+
+def create_localization_plot(localization_data, all_transcripts):
     print("Creating localization plot...")
     if len(all_transcripts) != 0:
         df_exploded = localization_data.copy().reset_index()
-        df_exploded['Protein_ID'] = df_exploded['Protein_ID'].str.split('<br>')
-        df_exploded = df_exploded.explode('Protein_ID')
-        df_exploded.set_index('Protein_ID', inplace=True)
+        df_exploded["Protein_ID"] = df_exploded["Protein_ID"].str.split("<br>")
+        df_exploded = df_exploded.explode("Protein_ID")
+        df_exploded.set_index("Protein_ID", inplace=True)
         localization_data_plot = df_exploded
     else:
         localization_data_plot = localization_data.copy()
-        localization_data_plot.index = [index.split("<br>")[0] for index in localization_data_plot.index]
-        
+        localization_data_plot.index = [
+            index.split("<br>")[0] for index in localization_data_plot.index
+        ]
+
     # Sort by alphabetical order
     localization_data_plot.sort_index(inplace=True)
 
-    fig = go.Figure(data=go.Heatmap(
-        z=localization_data_plot.values,
-        x=localization_data_plot.columns.tolist(),
-        y=localization_data_plot.index.tolist(),
-        colorscale='RdBu_r',
-        zmin=0,
-        zmax=1,
-        xgap=0.5,
-        ygap=0.5,
-    ))
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=localization_data_plot.values,
+            x=localization_data_plot.columns.tolist(),
+            y=localization_data_plot.index.tolist(),
+            colorscale=[
+                [0.0, "#2563eb"],
+                [0.5, "#f1f5f9"],
+                [1.0, "#d32f2f"]
+            ],
+            zmin=0,
+            zmax=1,
+            xgap=1.5,
+            ygap=1.5,
+            colorbar=dict(
+                title=dict(
+                    text="Probability",
+                    font=dict(color="#eceef4", size=14, family="Inter"),
+                    side="top",
+                ),
+                tickfont=dict(color="#8f9bb3", size=12, family="Inter"),
+                thickness=30,
+                lenmode="pixels",
+                len=300,
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02,
+            ),
+        )
+    )
 
     fig.update_layout(
-        height=len(localization_data_plot)*100,
-        yaxis=dict(autorange='reversed'), # Often needed to keep top-to-bottom orientation
-        margin=dict(l=50, r=50, t=50, b=50)
+        height=len(localization_data_plot) * 50 + 100,
+        yaxis=dict(
+            autorange="reversed",
+            tickfont=dict(
+                color="#8f9bb3", size=11, family="Inter"
+            ),  # Soft blue-gray text color
+            showgrid=False,
+            ticklabelstandoff=15,
+        ),
+        xaxis=dict(
+            tickfont=dict(
+                color="#8f9bb3", size=11, family="Inter"
+            ),  # Soft blue-gray text color
+            showgrid=False,
+            side="top",
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=150, r=150, t=50, b=50),
     )
 
     return fig
 
-def create_topology_plot(mapping, sequences_data, unique_transcripts, title, x_label, all_transcripts):
+
+def create_topology_plot(
+    mapping, sequences_data, unique_transcripts, x_label, all_transcripts
+):
     print("Creating topology plot...")
 
-    # Define colors and labels
+    # High contrast vibrant color map
     color_map = {
-        'S': '#FF0000',
-        'O': '#E69F00',
-        'I': '#95B8C8',
-        '-': "#808080",
-        'M': '#006D6F', 
+        "S": "#ff7675",  # Salmon / Coral Red
+        "O": "#fbbf24",  # Amber (Extracellular)
+        "I": "#60a5fa",  # Blue (Intracellular)
+        "-": "#64748b",  # Slate (Alignment gap)
+        "M": "#10b981",  # Emerald (Transmembrane)
     }
 
     letter_to_label = {
-        'S': 'Signal peptide', 
-        'O': 'Extracellular', 
-        'I': 'Intracellular',
-        '-': 'Alignment gap', 
-        'M': 'Transmembrane', 
+        "S": "Signal peptide",
+        "O": "Extracellular",
+        "I": "Intracellular",
+        "-": "Alignment gap",
+        "M": "Transmembrane",
     }
 
     fig = go.Figure()
     isoforms = list(dict.fromkeys(mapping.values()))
-    y_labels = [transcript_id for isoform in isoforms for transcript_id in isoform.split("<br>")]
-    y_labels, sequences_data = zip(*sorted(zip(y_labels, sequences_data), key=lambda x: x[0]))
+    y_labels = [
+        transcript_id for isoform in isoforms for transcript_id in isoform.split("<br>")
+    ]
+    y_labels, sequences_data = zip(
+        *sorted(zip(y_labels, sequences_data), key=lambda x: x[0])
+    )
 
     y_label_available = [y_label in unique_transcripts for y_label in y_labels]
 
-    # Group data by feature to minimize Plotly traces (one trace per feature type)
+    # Group data by feature to minimize Plotly traces
     feature_data = {
-        feat: {'x': [], 'base': [], 'y': [], 'hovertext': []}
+        feat: {"x": [], "base": [], "y": [], "hovertext": []}
         for feat in color_map.keys()
     }
 
@@ -76,98 +123,120 @@ def create_topology_plot(mapping, sequences_data, unique_transcripts, title, x_l
             continue
 
         y_val = y_labels[i]
-        
+
         for feature, ranges in seq_data.items():
             if feature not in feature_data:
-                feature_data[feature] = {'x': [], 'base': [], 'y': [], 'hovertext': []}
+                feature_data[feature] = {"x": [], "base": [], "y": [], "hovertext": []}
             for start, width in ranges:
-                feature_data[feature]['x'].append(width)
-                feature_data[feature]['base'].append(start)
-                feature_data[feature]['y'].append(y_val)
+                feature_data[feature]["x"].append(width)
+                feature_data[feature]["base"].append(start)
+                feature_data[feature]["y"].append(y_val)
                 feat_label = letter_to_label.get(feature, feature)
-                feature_data[feature]['hovertext'].append(
+                feature_data[feature]["hovertext"].append(
                     f"<b>{feat_label}</b><br>"
                     f"Range: {start} - {start + width}<br>"
                     f"Length: {width}"
                 )
 
     for feature, data in feature_data.items():
-        if not data['x']:
+        if not data["x"]:
             continue
-        fig.add_trace(go.Bar(
-            name=letter_to_label.get(feature, feature),
-            x=data['x'],
-            base=data['base'],
-            y=data['y'],
-            orientation='h',
-            marker_color=color_map.get(feature, '#000000'),
-            hovertext=data['hovertext'],
-            hovertemplate="%{hovertext}<extra></extra>",
-            legendgroup=feature,
-            showlegend=True
-        ))
+        fig.add_trace(
+            go.Bar(
+                name=letter_to_label.get(feature, feature),
+                x=data["x"],
+                base=data["base"],
+                y=data["y"],
+                orientation="h",
+                marker_color=color_map.get(feature, "#000000"),
+                hovertext=data["hovertext"],
+                hovertemplate="%{hovertext}<extra></extra>",
+                legendgroup=feature,
+                showlegend=True,
+            )
+        )
 
-    # Calculate height to match your original logic
+    # Calculate height to match original logic
     if len(all_transcripts) == 0:
         num_isoforms = len(unique_transcripts)
     else:
         num_isoforms = len(y_labels)
-    calculated_height = num_isoforms * 50 
+    calculated_height = num_isoforms * 50 + 100
 
     fig.update_layout(
-        title={
-            'text': title,
-            'x': 0.5,
-            'y': 1,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': {'size': 20}
-        },
         xaxis_title=x_label,
-        barmode='stack', # This ensures bars with the same 'base' don't overlap vertically
-        bargap=0.02,
+        barmode="stack",
+        bargap=0.15,
         height=calculated_height,
-        plot_bgcolor='white',
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         legend=dict(
-            title="Features",
+            title=dict(
+                text="Features", font=dict(color="#eceef4", size=11, family="Inter")
+            ),
+            font=dict(color="#8f9bb3", size=10, family="Inter"),
             orientation="v",
             yanchor="top",
             y=1,
             xanchor="left",
-            x=1.02
+            x=1.02,
+            bgcolor="rgba(50, 55, 78, 0.8)",
+            bordercolor="rgba(255,255,255,0.15)",
+            borderwidth=1,
+        ),
+        xaxis=dict(
+            title=dict(font=dict(color="#8f9bb3", size=12, family="Inter")),
+            tickfont=dict(color="#8f9bb3", size=10, family="Inter"),
+            gridcolor="rgba(255,255,255,0.15)",
+            showgrid=True,
+            zeroline=False,
         ),
         yaxis=dict(
-            autorange="reversed", # Invert y-axis like your Matplotlib code
+            autorange="reversed",
+            tickfont=dict(color="#8f9bb3", size=11, family="Inter"),
             showgrid=False,
-            zeroline=False
+            zeroline=False,
+            ticklabelstandoff=15,
         ),
-        margin=dict(l=10, r=10, t=50, b=50)
+        margin=dict(l=150, r=150, t=50, b=50),
     )
 
     return fig
 
+
 def plot_expression_data(expression_df):
     print("Creating expression plot...")
 
-    tissue_types = expression_df.loc[:,"tissue_type"].unique().tolist()
+    tissue_types = expression_df.loc[:, "tissue_type"].unique().tolist()
 
     nb_tissue_types = len(tissue_types)
     rows_count = math.ceil(nb_tissue_types / 2)
-    pixels_per_row = 600
+    pixels_per_row = 400
 
-    fig = make_subplots(rows=math.ceil(nb_tissue_types/2), 
-                        cols=2 if nb_tissue_types > 1 else 1,
-                        shared_yaxes="all",
-                        subplot_titles=tissue_types,
-                        vertical_spacing=150 / (rows_count * pixels_per_row), # 150 pixels vertical spacing between plots
-                        horizontal_spacing= 0.03, # 3% horizontal spacing between plots
-                        )
+    fig = make_subplots(
+        rows=math.ceil(nb_tissue_types / 2),
+        cols=2 if nb_tissue_types > 1 else 1,
+        shared_yaxes="all",
+        subplot_titles=tissue_types,
+        vertical_spacing=120 / (rows_count * pixels_per_row),
+        horizontal_spacing=0.03,
+    )
 
-    colors = fig.layout.template.layout.colorway
+    # Coordinated theme-aligned high contrast colors from the reference image
+    vibrant_colors = [
+        "#ff7675",  # Salmon / Coral Red
+        "#2ec4b6",  # Mint / Turquoise
+        "#ffa62b",  # Amber / Orange
+        "#9b5de5",  # Violet / Purple
+        "#00b4d8",  # Cyan / Light Blue
+        "#82c91e",  # Lime / Yellow-Green
+    ]
 
     for i, tissue_type in enumerate(tissue_types):
-        data_for_each_tissue_type = expression_df.loc[(expression_df.loc[:,"tissue_type"] == tissue_type), :]
-        current_color = colors[i % len(colors)]
+        data_for_each_tissue_type = expression_df.loc[
+            (expression_df.loc[:, "tissue_type"] == tissue_type), :
+        ]
+        current_color = vibrant_colors[i % len(vibrant_colors)]
 
         fig.add_trace(
             go.Box(
@@ -179,15 +248,17 @@ def plot_expression_data(expression_df):
                 upperfence=data_for_each_tissue_type["upperfence"].iloc[0],
                 showlegend=False,
                 marker_color=current_color,
-            ), 
-            row=i//2+1, 
-            col=i%2+1,
+                line=dict(width=1.5, color=current_color),
+                fillcolor="rgba(0, 0, 0, 0)",
+            ),
+            row=i // 2 + 1,
+            col=i % 2 + 1,
         )
 
         proteins = data_for_each_tissue_type["protein"].iloc[0]
         outliers_lists = data_for_each_tissue_type["y"].iloc[0]
 
-        # We combine all X and Y coordinates into single flat lists for this trace
+        # Combine coordinates for Scatter
         all_x = []
         all_y = []
 
@@ -195,30 +266,48 @@ def plot_expression_data(expression_df):
             all_x.extend([protein] * len(values))
             all_y.extend(values)
 
-        # Same color as the box plot
         fig.add_trace(
             go.Scatter(
-                x=all_x, 
+                x=all_x,
                 y=all_y,
-                mode='markers',
+                mode="markers",
                 marker=dict(
-                    size=5,
-                    symbol='circle-open',
+                    size=4.5,
+                    symbol="circle-open",
                     color=current_color,
+                    opacity=0.8,
                 ),
                 showlegend=False,
             ),
-            row=i//2+1,
-            col=i%2+1
+            row=i // 2 + 1,
+            col=i % 2 + 1,
         )
 
+    # Style subplot title labels
+    for annotation in fig["layout"]["annotations"]:
+        annotation["font"] = dict(
+            size=12, color="#eceef4", family="Inter"
+        )  # Normal weight, soft gray
+
     fig.update_layout(
-        height=rows_count * pixels_per_row, 
-        yaxis=dict(
-            title=dict(
-                text="log2(TPM+1)",
-            )
+        height=rows_count * pixels_per_row,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=50, r=20, t=50, b=50),
+    )
+
+    # Standardize axes gridlines and labels
+    fig.update_xaxes(
+        tickfont=dict(color="#8f9bb3", size=10, family="Inter"), showgrid=False
+    )
+    fig.update_yaxes(
+        title=dict(
+            text="log2(TPM+1)", font=dict(color="#8f9bb3", size=11, family="Inter")
         ),
+        tickfont=dict(color="#8f9bb3", size=10, family="Inter"),
+        gridcolor="rgba(255,255,255,0.15)",
+        showgrid=True,
+        zeroline=False,
     )
 
     return fig

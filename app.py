@@ -18,7 +18,9 @@ import bisect
 # Initial values for the dropdowns
 tissue_types_inital_value = []
 
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(
+    external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True
+)
 server = app.server
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -46,34 +48,37 @@ def getting_gene_names(gene_name):
 
 header = html.Div(
     [
-        html.H3("Transcript Explorer", className="me-4"),
+        html.H3("Transcript Explorer", className="header-title me-auto"),
         html.Div(
             [
                 dbc.Input(
                     id="protein-input",
-                    placeholder="Type a protein name...",
+                    placeholder="Search protein (e.g. TP53)...",
                     autoComplete="off",
+                    className="custom-input me-2",
+                    style={"width": "280px"},
                 ),
                 dbc.ListGroup(
                     id="protein-options",
+                    className="custom-autocomplete",
                     style={
                         "position": "absolute",
                         "top": "100%",
                         "left": 0,
-                        "width": "100%",
+                        "width": "280px",
                         "zIndex": 1000,
                         "maxHeight": "200px",
                         "overflowY": "auto",
-                        "display": "none",  # Hidden by default
+                        "display": "none",
                     },
                 ),
             ],
             style={"position": "relative"},
+            className="d-flex align-items-center me-2",
         ),
-        dbc.Button("Submit", id="protein-submit", n_clicks=0),
+        dbc.Button("Search", id="protein-submit", n_clicks=0, className="custom-btn"),
     ],
-    className="d-flex align-items-center border-bottom mb-4 pt-2 ps-3",
-    style={"height": "60px"},
+    className="custom-header d-flex align-items-center mb-4",
 )
 
 sidebar = html.Div(
@@ -103,13 +108,7 @@ sidebar = html.Div(
             pills=True,
         ),
     ],
-    style={
-        "backgroundColor": "#f8f9fa",
-        "padding": "10px",
-        "border": "1px solid #dee2e6",
-        "borderRadius": "4px",
-        "height": "100%",
-    },
+    className="custom-sidebar",
 )
 
 content = html.Div(id="page-content")
@@ -117,22 +116,27 @@ content = html.Div(id="page-content")
 app.layout = dbc.Container(
     [
         dcc.Location(id="url", refresh=False),
+        dcc.Store(
+            id="checklist-store",
+            data={"localization": ["all"], "topology": ["all"], "protein": None},
+        ),
         header,
         dbc.Row(
             [
-                # Left Column (Sidebar) - Width 3/12
-                dbc.Col(sidebar, width=3),
-                # Right Column (Content) - Width 9/12
+                # Left Column (Sidebar) - Width 2/12
+                dbc.Col(sidebar, width=2),
+                # Right Column (Content) - Width 10/12
                 dbc.Col(
                     [
                         content,
                     ],
-                    width=9,
+                    width=10,
                 ),
-            ]
+            ],
+            className="main-row g-4",
         ),
     ],
-    fluid=True,  # Uses full width of the screen
+    fluid=True,
     className="p-0",
 )
 
@@ -295,94 +299,204 @@ def update_nav_links(search):
     Output("protein-options", "style", allow_duplicate=True),
     Input("url", "search"),
     Input("url", "pathname"),
+    State("checklist-store", "data"),
     prevent_initial_call=True,
 )
-def render_page_content(query, pathname):
+def render_page_content(query, pathname, checklist_data):
 
     protein = get_query_data(query)
 
     if protein is None:
-        return html.P("Please select a protein"), {"display": "none"}
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.H4(
+                            "Welcome to Transcript Explorer", className="card-title"
+                        ),
+                        html.P(
+                            "Please search and select a protein in the search bar above to begin analysis.",
+                            className="desc-text",
+                        ),
+                    ],
+                    className="custom-card text-center py-5",
+                )
+            ]
+        ), {"display": "none"}
 
     protein = getting_gene_names(protein.upper())
 
     if protein is None:
-        return html.P("This protein is not in the database"), {"display": "none"}
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.H4(
+                            "Protein Not Found", className="card-title text-danger"
+                        ),
+                        html.P(
+                            "The requested gene/protein is not in the database. Please try another search.",
+                            className="desc-text",
+                        ),
+                    ],
+                    className="custom-card text-center py-5",
+                )
+            ]
+        ), {"display": "none"}
 
     # Check if the gene encodes any valid protein
     has_valid_protein = db_mapping.get(protein) is not None
 
     if not has_valid_protein:
-        return html.P(
-            f"This is the content of the home page of "
-            + protein
-            + "!"
-            + "\n"
-            + "This gene does not encode for any coding protein"
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.H4(f"{protein} Profile Overview", className="card-title"),
+                        html.P(
+                            f"This gene ({protein}) does not encode for any known protein coding variant in this database.",
+                            className="desc-text text-warning",
+                        ),
+                    ],
+                    className="custom-card",
+                )
+            ]
         ), {"display": "none"}
 
+    loc_value = ["all"]
+    top_value = ["all"]
+    if checklist_data and checklist_data.get("protein") == protein:
+        loc_value = checklist_data.get("localization", ["all"])
+        top_value = checklist_data.get("topology", ["all"])
+
     if pathname == "/":
-        return html.P("This is the content of the home page of " + protein + "!"), {
-            "display": "none"
-        }
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.H4(f"{protein} Profile Overview", className="card-title"),
+                        html.P(
+                            f"Welcome to the interactive Transcript Explorer for the gene {protein}.",
+                            className="desc-text mb-4",
+                        ),
+                        html.Div(
+                            [
+                                html.Span(
+                                    "Status: Active Entry", className="badge-info me-2"
+                                ),
+                                html.Span(
+                                    "Available: Localization, Topology, Expression",
+                                    className="badge-info",
+                                ),
+                            ],
+                            className="mb-4",
+                        ),
+                        html.Hr(style={"borderColor": "rgba(255,255,255,0.05)"}),
+                        html.H5(
+                            "Explore Transcript Variants",
+                            className="mt-4 mb-3",
+                            style={"fontWeight": "600", "fontSize": "1.1rem"},
+                        ),
+                        html.P(
+                            "Select from the options in the sidebar navigation to view cellular localization predictions, "
+                            "membrane topology alignments, and transcript expression comparison levels.",
+                            className="desc-text",
+                        ),
+                    ],
+                    className="custom-card",
+                )
+            ]
+        ), {"display": "none"}
 
     elif pathname == "/Localization":
         return html.Div(
             [
-                dbc.Checklist(
-                    options=[
-                        {
-                            "label": "Showing all transcripts, even those that lead to the same protein",
-                            "value": "all",
-                        },
+                html.Div(
+                    [
+                        html.H4("Subcellular Localization", className="card-title"),
+                        html.P(
+                            "This heatmap displays the predicted probability scores of different subcellular localization destinations "
+                            "for the transcript isoforms of the protein.",
+                            className="desc-text mb-4",
+                        ),
+                        dbc.Checklist(
+                            options=[
+                                {
+                                    "label": "Show all transcripts, including duplicates mapping to the same protein sequence",
+                                    "value": "all",
+                                },
+                            ],
+                            value=loc_value,
+                            switch=True,
+                            id="localization-checklist",
+                            className="mb-4",
+                        ),
+                        html.Div(
+                            dbc.Spinner(
+                                children=dcc.Graph(id="localization-plot"),
+                                size="lg",
+                                color="primary",
+                                type="border",
+                                fullscreen=False,
+                                id="localization-spinner",
+                                spinner_style={
+                                    "position": "absolute",
+                                    "top": "50px",
+                                    "left": "50%",
+                                    "transform": "translate(-50%, -50%)",
+                                },
+                            ),
+                            style={"position": "relative", "minHeight": "200px"},
+                        ),
                     ],
-                    value=["all"],
-                    switch=True,
-                    id="localization-checklist",
-                ),
-                dbc.Spinner(
-                    children=dcc.Graph(id="localization-plot"),
-                    size="lg",
-                    color="primary",
-                    type="border",
-                    fullscreen=False,
-                    id="localization-spinner",
-                    spinner_style={
-                        "position": "absolute",
-                        "top": "20px",
-                        "left": "50%",
-                    },
-                ),
+                    className="custom-card",
+                )
             ]
         ), {"display": "none"}
 
     elif pathname == "/Topology":
         return html.Div(
             [
-                dbc.Checklist(
-                    options=[
-                        {
-                            "label": "Showing all transcripts, even those that lead to the same protein",
-                            "value": "all",
-                        },
+                html.Div(
+                    [
+                        html.H4("Membrane Topology Alignment", className="card-title"),
+                        html.P(
+                            "Visualizes the predicted structural features (transmembrane regions, intracellular/extracellular segments) "
+                            "along the amino acid alignments for each transcript isoform.",
+                            className="desc-text mb-4",
+                        ),
+                        dbc.Checklist(
+                            options=[
+                                {
+                                    "label": "Show all transcripts, including duplicates mapping to the same protein sequence",
+                                    "value": "all",
+                                },
+                            ],
+                            value=top_value,
+                            switch=True,
+                            id="topology-checklist",
+                            className="mb-4",
+                        ),
+                        html.Div(
+                            dbc.Spinner(
+                                children=dcc.Graph(id="topology-plot"),
+                                size="lg",
+                                color="primary",
+                                type="border",
+                                fullscreen=False,
+                                id="topology-spinner",
+                                spinner_style={
+                                    "position": "absolute",
+                                    "top": "50px",
+                                    "left": "50%",
+                                    "transform": "translate(-50%, -50%)",
+                                },
+                            ),
+                            style={"position": "relative", "minHeight": "200px"},
+                        ),
                     ],
-                    value=["all"],
-                    switch=True,
-                    id="topology-checklist",
-                ),
-                dbc.Spinner(
-                    children=dcc.Graph(id="topology-plot"),
-                    size="lg",
-                    color="primary",
-                    type="border",
-                    fullscreen=False,
-                    id="topology-spinner",
-                    spinner_style={
-                        "position": "absolute",
-                        "top": "20px",
-                        "left": "50%",
-                    },
-                ),
+                    className="custom-card",
+                )
             ]
         ), {"display": "none"}
 
@@ -402,53 +516,94 @@ def manage_expression_page(expression_container_id, search):
     expression_df = get_expression_data(protein)
 
     if expression_df is None:
-        return html.P("Expression data is not available for this protein's transcripts")
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.H4(
+                            "Transcript Expression Profile", className="card-title"
+                        ),
+                        html.P(
+                            "Expression data is not available for this protein's transcripts.",
+                            className="desc-text",
+                        ),
+                    ],
+                    className="custom-card",
+                )
+            ]
+        )
 
     return html.Div(
         [
             html.Div(
                 [
-                    html.P("Select the cancer types to plot:"),
-                    dcc.Dropdown(
-                        options=expression_df.loc[:, "tissue_type"].unique(),
-                        value=tissue_types_inital_value,
-                        multi=True,
-                        id="expression-cancer-type-dropdown",
-                        placeholder="Select or leave empty to plot all cancer types",
+                    html.H4("Transcript Expression Profile", className="card-title"),
+                    html.P(
+                        "Analyze and compare expression distributions across various healthy tissues and cancer types. "
+                        "Select target cancer/tissue types below or leave empty to plot all datasets.",
+                        className="desc-text mb-4",
                     ),
-                    html.Br(),
-                    # We want the buttons next to each other
-                    dbc.Button(
-                        "Load plot", id="expression-load-button", className="me-1"
+                    html.Div(
+                        [
+                            dcc.Dropdown(
+                                options=expression_df.loc[:, "tissue_type"].unique(),
+                                value=tissue_types_inital_value,
+                                multi=True,
+                                id="expression-cancer-type-dropdown",
+                                placeholder="Select tissue/cancer types...",
+                                className="dash-dropdown mb-3",
+                            ),
+                            # Load button
+                            dbc.Button(
+                                "Load Expression Plot",
+                                id="expression-load-button",
+                                className="custom-btn w-100",
+                            ),
+                        ],
+                        id="expression-parameters-container",
                     ),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    dbc.Button(
+                                        "Filter Parameters",
+                                        id="expression-reset-button",
+                                        className="custom-btn btn-secondary mb-4",
+                                        style={
+                                            "background": "#1e293b",
+                                            "border": "1px solid rgba(255,255,255,0.08)",
+                                            "color": "#f8fafc",
+                                        },
+                                    ),
+                                ],
+                                className="d-flex justify-content-end",
+                            ),
+                            html.Div(
+                                dbc.Spinner(
+                                    children=dcc.Graph(id="expression-plot"),
+                                    size="lg",
+                                    color="primary",
+                                    type="border",
+                                    fullscreen=False,
+                                    id="expression-spinner",
+                                    spinner_style={
+                                        "position": "absolute",
+                                        "top": "50px",
+                                        "left": "50%",
+                                        "transform": "translate(-50%, -50%)",
+                                    },
+                                ),
+                                style={"position": "relative", "minHeight": "300px"},
+                            ),
+                        ],
+                        id="expression-container",
+                        style={"display": "none"},
+                    ),
+                    dcc.Store(id="expression-parameters"),
                 ],
-                id="expression-parameters-container",
-            ),
-            html.Div(
-                [
-                    dbc.Button(
-                        "Reset parameters",
-                        id="expression-reset-button",
-                        className="me-1",
-                    ),
-                    dbc.Spinner(
-                        children=dcc.Graph(id="expression-plot"),
-                        size="lg",
-                        color="primary",
-                        type="border",
-                        fullscreen=False,
-                        id="expression-spinner",
-                        spinner_style={
-                            "position": "absolute",
-                            "top": "20px",
-                            "left": "50%",
-                        },
-                    ),
-                ],
-                id="expression-container",
-                style={"display": "none"},
-            ),
-            dcc.Store(id="expression-parameters"),
+                className="custom-card",
+            )
         ]
     )
 
@@ -511,12 +666,11 @@ def topology_plot(search, all_transcripts):
     protein = getting_gene_names(protein.upper())
     if not protein:
         return go.Figure()
-    title = "Membrane topology"
     x_label = "Amino acid position in MSA"
     mapping, sequences_data, unique_transcripts = get_topology_data(protein)
 
     fig = create_topology_plot(
-        mapping, sequences_data, unique_transcripts, title, x_label, all_transcripts
+        mapping, sequences_data, unique_transcripts, x_label, all_transcripts
     )
     return fig
 
@@ -553,5 +707,51 @@ def update_expression_plot(parameters, search, is_clicked):
     return fig
 
 
+@app.callback(
+    Output("checklist-store", "data", allow_duplicate=True),
+    Input("localization-checklist", "value"),
+    State("checklist-store", "data"),
+    State("url", "search"),
+    prevent_initial_call=True,
+)
+def update_localization_store(value, current_data, search):
+    protein = get_query_data(search)
+    if protein:
+        protein = getting_gene_names(protein.upper())
+
+    if current_data is None or current_data.get("protein") != protein:
+        return {
+            "localization": value if value is not None else [],
+            "topology": ["all"],
+            "protein": protein,
+        }
+
+    current_data["localization"] = value if value is not None else []
+    return current_data
+
+
+@app.callback(
+    Output("checklist-store", "data", allow_duplicate=True),
+    Input("topology-checklist", "value"),
+    State("checklist-store", "data"),
+    State("url", "search"),
+    prevent_initial_call=True,
+)
+def update_topology_store(value, current_data, search):
+    protein = get_query_data(search)
+    if protein:
+        protein = getting_gene_names(protein.upper())
+
+    if current_data is None or current_data.get("protein") != protein:
+        return {
+            "localization": ["all"],
+            "topology": value if value is not None else [],
+            "protein": protein,
+        }
+
+    current_data["topology"] = value if value is not None else []
+    return current_data
+
+
 if __name__ == "__main__":
-    app.run(debug=True, port="8051")
+    app.run(debug=True, port=8051)
