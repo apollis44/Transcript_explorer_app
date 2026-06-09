@@ -41,4 +41,4 @@ fi
 
 echo "Data assets ready. Starting the application..."
 # Replace this with your actual app startup command (e.g., uvicorn, gunicorn, streamlit)
-python app/main.py
+gunicorn app:server
