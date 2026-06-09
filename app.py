@@ -273,7 +273,7 @@ def render_page_content(query, pathname):
     db_mapping.close()
 
     if not has_valid_protein:
-        return html.P("This is the content of the home page of " + protein + + "!" + "\n" + "This gene does not encode for any coding protein"), {"display": "none"}
+        return html.P(f"This is the content of the home page of " + protein + "!" + "\n" + "This gene does not encode for any coding protein"), {"display": "none"}
 
     if pathname == "/":
         return html.P("This is the content of the home page of " + protein + "!"), {"display": "none"}
