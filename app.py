@@ -754,4 +754,4 @@ def update_topology_store(value, current_data, search):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8051)
+    app.run(debug=True)
