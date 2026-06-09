@@ -64,7 +64,11 @@ def create_topology_plot(mapping, sequences_data, unique_transcripts, title, x_l
 
     y_label_available = [y_label in unique_transcripts for y_label in y_labels]
 
-    added_to_legend = set()
+    # Group data by feature to minimize Plotly traces (one trace per feature type)
+    feature_data = {
+        feat: {'x': [], 'base': [], 'y': [], 'hovertext': []}
+        for feat in color_map.keys()
+    }
 
     # Loop through sequences (isoforms)
     for i, seq_data in enumerate(sequences_data):
@@ -74,22 +78,34 @@ def create_topology_plot(mapping, sequences_data, unique_transcripts, title, x_l
         y_val = y_labels[i]
         
         for feature, ranges in seq_data.items():
+            if feature not in feature_data:
+                feature_data[feature] = {'x': [], 'base': [], 'y': [], 'hovertext': []}
             for start, width in ranges:
-                # Add a bar for each segment
-                fig.add_trace(go.Bar(
-                    name=letter_to_label.get(feature, feature),
-                    x=[width],
-                    base=[start],
-                    y=[y_val],
-                    orientation='h',
-                    marker_color=color_map.get(feature, '#000000'),
-                    showlegend=True if feature not in added_to_legend else False,
-                    legendgroup=feature, # Groups identical features in the legend
-                    hovertemplate=f"<b>{letter_to_label.get(feature)}</b><br>" +
-                                  f"Range: {start} - {start + width}<br>" +
-                                  f"Length: {width}<extra></extra>"
-                ))
-                added_to_legend.add(feature)
+                feature_data[feature]['x'].append(width)
+                feature_data[feature]['base'].append(start)
+                feature_data[feature]['y'].append(y_val)
+                feat_label = letter_to_label.get(feature, feature)
+                feature_data[feature]['hovertext'].append(
+                    f"<b>{feat_label}</b><br>"
+                    f"Range: {start} - {start + width}<br>"
+                    f"Length: {width}"
+                )
+
+    for feature, data in feature_data.items():
+        if not data['x']:
+            continue
+        fig.add_trace(go.Bar(
+            name=letter_to_label.get(feature, feature),
+            x=data['x'],
+            base=data['base'],
+            y=data['y'],
+            orientation='h',
+            marker_color=color_map.get(feature, '#000000'),
+            hovertext=data['hovertext'],
+            hovertemplate="%{hovertext}<extra></extra>",
+            legendgroup=feature,
+            showlegend=True
+        ))
 
     # Calculate height to match your original logic
     if len(all_transcripts) == 0:

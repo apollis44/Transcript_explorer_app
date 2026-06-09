@@ -1,7 +1,11 @@
 import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, dcc, html, State, ctx, ALL, no_update
-from scripts.plots_generation import create_localization_plot, plot_expression_data, create_topology_plot
+from scripts.plots_generation import (
+    create_localization_plot,
+    plot_expression_data,
+    create_topology_plot,
+)
 import pandas as pd
 import os
 from functools import lru_cache
@@ -9,6 +13,7 @@ import shelve
 import numpy as np
 import urllib.parse
 import plotly.graph_objects as go
+import bisect
 
 # Initial values for the dropdowns
 tissue_types_inital_value = []
@@ -17,9 +22,20 @@ app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Get the protein options from the shelve file
-db_names = shelve.open(f"{base_dir}/files_for_plots/genes")
-protein_options = list(db_names.keys())
+# Open shelve databases globally at startup in read-only mode for performance
+db_names = shelve.open(f"{base_dir}/files_for_plots/genes", flag="r")
+db_deeploc = shelve.open(f"{base_dir}/files_for_plots/deeploc2_output", flag="r")
+db_tcga = shelve.open(f"{base_dir}/files_for_plots/TCGA_GTEx_plotting_data", flag="r")
+db_mapping = shelve.open(
+    f"{base_dir}/files_for_plots/transcripts_to_isoforms_mapping", flag="r"
+)
+db_topology = shelve.open(
+    f"{base_dir}/files_for_plots/membrane_topology_objects", flag="r"
+)
+
+# Sort protein options once at startup for fast binary search
+protein_options = sorted([p.upper() for p in db_names.keys()])
+
 
 def getting_gene_names(gene_name):
     if gene_name not in db_names:
@@ -27,85 +43,99 @@ def getting_gene_names(gene_name):
     gene_names = db_names[gene_name]
     return gene_names
 
+
 header = html.Div(
     [
         html.H3("Transcript Explorer", className="me-4"),
         html.Div(
             [
-                dbc.Input(id="protein-input", 
-                          placeholder="Type a protein name...",
-                          autoComplete="off"),
+                dbc.Input(
+                    id="protein-input",
+                    placeholder="Type a protein name...",
+                    autoComplete="off",
+                ),
                 dbc.ListGroup(
                     id="protein-options",
                     style={
-                        "position": "absolute", 
-                        "top": "100%", 
-                        "left": 0, 
-                        "width": "100%", 
+                        "position": "absolute",
+                        "top": "100%",
+                        "left": 0,
+                        "width": "100%",
                         "zIndex": 1000,
                         "maxHeight": "200px",
                         "overflowY": "auto",
-                        "display": "none" # Hidden by default
-                    }
+                        "display": "none",  # Hidden by default
+                    },
                 ),
-            ], 
+            ],
             style={"position": "relative"},
         ),
         dbc.Button("Submit", id="protein-submit", n_clicks=0),
     ],
     className="d-flex align-items-center border-bottom mb-4 pt-2 ps-3",
-    style={"height": "60px"}
+    style={"height": "60px"},
 )
 
 sidebar = html.Div(
     [
         dbc.Nav(
             [
-                dbc.NavLink("Description", id="link-description", href="/", active="exact"),
-                dbc.NavLink("Localization", id="link-localization", href="/Localization", active="exact"),
-                dbc.NavLink("Topology", id="link-topology", href="/Topology", active="exact"),
-                dbc.NavLink("Expression", id="link-expression", href="/Expression", active="exact"),
+                dbc.NavLink(
+                    "Description", id="link-description", href="/", active="exact"
+                ),
+                dbc.NavLink(
+                    "Localization",
+                    id="link-localization",
+                    href="/Localization",
+                    active="exact",
+                ),
+                dbc.NavLink(
+                    "Topology", id="link-topology", href="/Topology", active="exact"
+                ),
+                dbc.NavLink(
+                    "Expression",
+                    id="link-expression",
+                    href="/Expression",
+                    active="exact",
+                ),
             ],
             vertical=True,
             pills=True,
         ),
     ],
     style={
-            "backgroundColor": "#f8f9fa",
-            "padding": "10px",
-            "border": "1px solid #dee2e6",
-            "borderRadius": "4px",
-            "height": "100%"
-        },
+        "backgroundColor": "#f8f9fa",
+        "padding": "10px",
+        "border": "1px solid #dee2e6",
+        "borderRadius": "4px",
+        "height": "100%",
+    },
 )
 
 content = html.Div(id="page-content")
 
 app.layout = dbc.Container(
-    [   
+    [
         dcc.Location(id="url", refresh=False),
         header,
         dbc.Row(
             [
                 # Left Column (Sidebar) - Width 3/12
-                dbc.Col(
-                    sidebar,
-                    width=3
-                ),
-                
+                dbc.Col(sidebar, width=3),
                 # Right Column (Content) - Width 9/12
                 dbc.Col(
                     [
                         content,
                     ],
-                    width=9
+                    width=9,
                 ),
             ]
         ),
     ],
-    fluid=True, # Uses full width of the screen
-    className="p-0"
+    fluid=True,  # Uses full width of the screen
+    className="p-0",
 )
+
 
 @app.callback(
     Output("protein-options", "children"),
@@ -116,36 +146,43 @@ app.layout = dbc.Container(
 def update_protein_options(value, n_clicks):
     if value is None:
         return [], {"display": "none"}
-    
+
     if n_clicks != [] and (np.array(n_clicks) != None).any():
         return no_update, no_update
-    
+
     options = []
 
-    valid_protein_options = [protein for protein in sorted(protein_options) if protein.upper().startswith(value.upper())]
+    prefix = value.upper()
+    start_idx = bisect.bisect_left(protein_options, prefix)
+    end_idx = bisect.bisect_left(protein_options, prefix + "\xff")
+    valid_protein_options = protein_options[start_idx:end_idx]
+
     for protein in valid_protein_options[:10]:
-            options.append(
-                dbc.ListGroupItem(
-                    protein,
-                    id={"type": "result-item", "index": protein},
-                    action=True
-                )
+        options.append(
+            dbc.ListGroupItem(
+                protein, id={"type": "result-item", "index": protein}, action=True
             )
+        )
 
     if len(valid_protein_options) > 10:
         options.append(
             dbc.ListGroupItem(
                 f"{len(valid_protein_options) - 10} more options",
                 disabled=True,
-                color="light"
+                color="light",
             )
         )
 
     style = {
-        "position": "absolute", "top": "100%", "left": 0, 
-        "width": "100%", "zIndex": 1000, "display": "block"
+        "position": "absolute",
+        "top": "100%",
+        "left": 0,
+        "width": "100%",
+        "zIndex": 1000,
+        "display": "block",
     }
     return options, style
+
 
 @app.callback(
     Output("protein-input", "value"),
@@ -153,7 +190,7 @@ def update_protein_options(value, n_clicks):
     Output("protein-submit", "n_clicks", allow_duplicate=True),
     Input({"type": "result-item", "index": ALL}, "n_clicks"),
     State("protein-submit", "n_clicks"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 def select_item(n_clicks, protein_submit_n_clicks):
     if not ctx.triggered:
@@ -163,39 +200,35 @@ def select_item(n_clicks, protein_submit_n_clicks):
         return no_update, no_update, no_update
 
     triggered_id = ctx.triggered_id
-    selected_value = triggered_id['index']
+    selected_value = triggered_id["index"]
 
     return selected_value, {"display": "none"}, protein_submit_n_clicks + 1
 
+
 @lru_cache(maxsize=10)
 def get_localization_data(protein):
-    db = shelve.open(f"{base_dir}/files_for_plots/deeploc2_output")
-    df = db[protein]
-    db.close()
+    df = db_deeploc.get(protein)
     if df is None:
         return None
-    df = df.iloc[:,:-4] # We exclude the last 4 columns that contains data we don't use
+    df = df.iloc[
+        :, :-4
+    ]  # We exclude the last 4 columns that contains data we don't use
     return df
+
 
 @lru_cache(maxsize=10)
 def get_expression_data(protein):
-    db = shelve.open(f"{base_dir}/files_for_plots/TCGA_GTEx_plotting_data")
-    df = db[protein]
-    db.close()
+    df = db_tcga.get(protein)
     if df is None:
         return None
-    df = df.groupby(['study', 'tissue_type'], sort=False).agg(list).reset_index()
+    df = df.groupby(["study", "tissue_type"], sort=False).agg(list).reset_index()
     return df
+
 
 @lru_cache(maxsize=10)
 def get_topology_data(protein):
-    db = shelve.open(f"{base_dir}/files_for_plots/transcripts_to_isoforms_mapping")
-    mapping = db[protein]
-    db.close()
-
-    db = shelve.open(f"{base_dir}/files_for_plots/membrane_topology_objects")
-    sequences_data = db[protein]
-    db.close()
+    mapping = db_mapping.get(protein)
+    sequences_data = db_topology.get(protein)
 
     if mapping is None or sequences_data is None:
         return None, None, None
@@ -206,6 +239,7 @@ def get_topology_data(protein):
 
     return mapping, sequences_data, unique_transcripts
 
+
 @lru_cache(maxsize=10)
 def get_query_data(search):
     search_str = search.lstrip("?") if "?" in search else ""
@@ -213,6 +247,7 @@ def get_query_data(search):
     if "protein" not in parsed_search:
         return None
     return parsed_search["protein"][0]
+
 
 @app.callback(
     Output("url", "search"),
@@ -225,12 +260,13 @@ def get_query_data(search):
 def update_query(n_submit, n_clicks, search, protein):
     if not ctx.triggered:
         return no_update
-    
+
     search_str = search.lstrip("?") if "?" in search else ""
     parsed_search = urllib.parse.parse_qs(search_str)
     parsed_search["protein"] = [protein]
     search_str = urllib.parse.urlencode(parsed_search, doseq=True)
     return "?" + search_str
+
 
 @app.callback(
     [
@@ -239,14 +275,20 @@ def update_query(n_submit, n_clicks, search, protein):
         Output("link-topology", "href"),
         Output("link-expression", "href"),
     ],
-    Input("url", "search")
+    Input("url", "search"),
 )
 def update_nav_links(search):
     # If search is None or empty, just return the base paths
     query = search if search else ""
-    
+
     # We return the base path + the current query string for each link
-    return f"/{query}", f"/Localization{query}",f"/Topology{query}", f"/Expression{query}"
+    return (
+        f"/{query}",
+        f"/Localization{query}",
+        f"/Topology{query}",
+        f"/Expression{query}",
+    )
+
 
 @app.callback(
     Output("page-content", "children"),
@@ -268,22 +310,31 @@ def render_page_content(query, pathname):
         return html.P("This protein is not in the database"), {"display": "none"}
 
     # Check if the gene encodes any valid protein
-    db_mapping = shelve.open(f"{base_dir}/files_for_plots/transcripts_to_isoforms_mapping")
     has_valid_protein = db_mapping.get(protein) is not None
-    db_mapping.close()
 
     if not has_valid_protein:
-        return html.P(f"This is the content of the home page of " + protein + "!" + "\n" + "This gene does not encode for any coding protein"), {"display": "none"}
+        return html.P(
+            f"This is the content of the home page of "
+            + protein
+            + "!"
+            + "\n"
+            + "This gene does not encode for any coding protein"
+        ), {"display": "none"}
 
     if pathname == "/":
-        return html.P("This is the content of the home page of " + protein + "!"), {"display": "none"}
+        return html.P("This is the content of the home page of " + protein + "!"), {
+            "display": "none"
+        }
 
     elif pathname == "/Localization":
         return html.Div(
             [
                 dbc.Checklist(
                     options=[
-                        {"label": "Showing all transcripts, even those that lead to the same protein", "value": "all"},
+                        {
+                            "label": "Showing all transcripts, even those that lead to the same protein",
+                            "value": "all",
+                        },
                     ],
                     value=["all"],
                     switch=True,
@@ -297,9 +348,9 @@ def render_page_content(query, pathname):
                     fullscreen=False,
                     id="localization-spinner",
                     spinner_style={
-                        "position": "absolute", 
-                        "top": "20px", 
-                        "left": "50%", 
+                        "position": "absolute",
+                        "top": "20px",
+                        "left": "50%",
                     },
                 ),
             ]
@@ -310,7 +361,10 @@ def render_page_content(query, pathname):
             [
                 dbc.Checklist(
                     options=[
-                        {"label": "Showing all transcripts, even those that lead to the same protein", "value": "all"},
+                        {
+                            "label": "Showing all transcripts, even those that lead to the same protein",
+                            "value": "all",
+                        },
                     ],
                     value=["all"],
                     switch=True,
@@ -324,9 +378,9 @@ def render_page_content(query, pathname):
                     fullscreen=False,
                     id="topology-spinner",
                     spinner_style={
-                        "position": "absolute", 
-                        "top": "20px", 
-                        "left": "50%", 
+                        "position": "absolute",
+                        "top": "20px",
+                        "left": "50%",
                     },
                 ),
             ]
@@ -334,6 +388,7 @@ def render_page_content(query, pathname):
 
     elif pathname == "/Expression":
         return html.Div(id="expression-container"), {"display": "none"}
+
 
 @app.callback(
     Output("expression-container", "children"),
@@ -349,43 +404,54 @@ def manage_expression_page(expression_container_id, search):
     if expression_df is None:
         return html.P("Expression data is not available for this protein's transcripts")
 
-    return html.Div([
-        html.Div([
-                html.P("Select the cancer types to plot:"),
-                dcc.Dropdown(
-                    options=expression_df.loc[:,"tissue_type"].unique(),
-                    value=tissue_types_inital_value,
-                    multi=True,
-                    id="expression-cancer-type-dropdown",
-                    placeholder="Select or leave empty to plot all cancer types",
-                ),
-                html.Br(),
-                # We want the buttons next to each other
-                dbc.Button("Load plot", id="expression-load-button", className="me-1")
-            ],
-            id="expression-parameters-container"
-        ),
-        html.Div([
-            dbc.Button("Reset parameters", id="expression-reset-button", className="me-1"),
-            dbc.Spinner(
-                children=dcc.Graph(id="expression-plot"),
-                size="lg",
-                color="primary",
-                type="border",
-                fullscreen=False,
-                id="expression-spinner",
-                spinner_style={
-                    "position": "absolute", 
-                    "top": "20px", 
-                    "left": "50%", 
-                },
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.P("Select the cancer types to plot:"),
+                    dcc.Dropdown(
+                        options=expression_df.loc[:, "tissue_type"].unique(),
+                        value=tissue_types_inital_value,
+                        multi=True,
+                        id="expression-cancer-type-dropdown",
+                        placeholder="Select or leave empty to plot all cancer types",
+                    ),
+                    html.Br(),
+                    # We want the buttons next to each other
+                    dbc.Button(
+                        "Load plot", id="expression-load-button", className="me-1"
+                    ),
+                ],
+                id="expression-parameters-container",
             ),
-            ],
-            id="expression-container",
-            style={'display': 'none'}
-        ),
-        dcc.Store(id="expression-parameters")
-    ])
+            html.Div(
+                [
+                    dbc.Button(
+                        "Reset parameters",
+                        id="expression-reset-button",
+                        className="me-1",
+                    ),
+                    dbc.Spinner(
+                        children=dcc.Graph(id="expression-plot"),
+                        size="lg",
+                        color="primary",
+                        type="border",
+                        fullscreen=False,
+                        id="expression-spinner",
+                        spinner_style={
+                            "position": "absolute",
+                            "top": "20px",
+                            "left": "50%",
+                        },
+                    ),
+                ],
+                id="expression-container",
+                style={"display": "none"},
+            ),
+            dcc.Store(id="expression-parameters"),
+        ]
+    )
+
 
 @app.callback(
     Output("expression-container", "style"),
@@ -400,11 +466,17 @@ def manage_expression_page(expression_container_id, search):
 )
 def expression_container_style(_1, _2, tissue_types):
     ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
     if trigger_id == "expression-load-button":
-        return {'display': 'block'}, {'display': 'none'}, tissue_types, tissue_types
+        return {"display": "block"}, {"display": "none"}, tissue_types, tissue_types
     elif trigger_id == "expression-reset-button":
-        return {'display': 'none'}, {'display': 'block'}, tissue_types_inital_value, tissue_types_inital_value
+        return (
+            {"display": "none"},
+            {"display": "block"},
+            tissue_types_inital_value,
+            tissue_types_inital_value,
+        )
+
 
 @app.callback(
     Output("localization-plot", "figure"),
@@ -425,6 +497,7 @@ def localization_plot(search, all_transcripts):
     fig = create_localization_plot(localization_data, all_transcripts)
     return fig
 
+
 @app.callback(
     Output("topology-plot", "figure"),
     Input("url", "search"),
@@ -442,11 +515,14 @@ def topology_plot(search, all_transcripts):
     x_label = "Amino acid position in MSA"
     mapping, sequences_data, unique_transcripts = get_topology_data(protein)
 
-    fig = create_topology_plot(mapping, sequences_data, unique_transcripts, title, x_label, all_transcripts)
+    fig = create_topology_plot(
+        mapping, sequences_data, unique_transcripts, title, x_label, all_transcripts
+    )
     return fig
 
+
 @app.callback(
-    Output('expression-plot', 'figure'),
+    Output("expression-plot", "figure"),
     Input("expression-parameters", "data"),
     State("url", "search"),
     Input("expression-reset-button", "n_clicks"),
@@ -455,7 +531,7 @@ def topology_plot(search, all_transcripts):
 )
 def update_expression_plot(parameters, search, is_clicked):
     ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
     if trigger_id == "expression-reset-button":
         return
 
@@ -466,13 +542,16 @@ def update_expression_plot(parameters, search, is_clicked):
 
     # Filter cancer type
     if len(tissue_types) > 0:
-        expression_df = expression_df.loc[expression_df.loc[:,"tissue_type"].isin(tissue_types),:]
-    
+        expression_df = expression_df.loc[
+            expression_df.loc[:, "tissue_type"].isin(tissue_types), :
+        ]
+
     # Generate the plot
     fig = plot_expression_data(expression_df)
 
     # Reset the buttons and close the popover
     return fig
 
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port="8051")

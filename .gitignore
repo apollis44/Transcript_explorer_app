@@ -1,2 +1,6 @@
 files_for_plots/
 __pycache__
+.python-version
+.venv
+uv.lock
+pyproject.toml
