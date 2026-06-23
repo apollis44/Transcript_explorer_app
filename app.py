@@ -552,6 +552,7 @@ def manage_expression_page(expression_container_id, search):
                                 id="expression-cancer-type-dropdown",
                                 placeholder="Select tissue/cancer types...",
                                 className="dash-dropdown mb-3",
+                                style={"color": "#1e293b"},
                             ),
                             # Load button
                             dbc.Button(
@@ -585,16 +586,11 @@ def manage_expression_page(expression_container_id, search):
                                     size="lg",
                                     color="primary",
                                     type="border",
-                                    fullscreen=False,
                                     id="expression-spinner",
-                                    spinner_style={
-                                        "position": "absolute",
-                                        "top": "50px",
-                                        "left": "50%",
-                                        "transform": "translate(-50%, -50%)",
-                                    },
+                                    # Supprime ou vide spinner_style car Flexbox va gérer le centrage automatiquement
+                                    spinner_style={},
                                 ),
-                                style={"position": "relative", "minHeight": "300px"},
+                                style={"position": "relative", "minHeight": "150px"},
                             ),
                         ],
                         id="expression-container",
