@@ -16,7 +16,7 @@
 
 body {
     background-color: var(--bg-color);
-    background-image: 
+    background-image:
         radial-gradient(at 0% 0%, rgba(97, 58, 102, 0.15) 0px, transparent 60%),
         radial-gradient(at 100% 100%, rgba(81, 117, 122, 0.12) 0px, transparent 60%),
         radial-gradient(at 50% 100%, rgba(115, 90, 48, 0.1) 0px, transparent 60%);
@@ -34,14 +34,17 @@ body {
     width: 10px;
     height: 10px;
 }
+
 ::-webkit-scrollbar-track {
     background: var(--bg-color);
 }
+
 ::-webkit-scrollbar-thumb {
     background: #1e2230;
     border: 2px solid var(--bg-color);
     border-radius: 6px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
     background: #475569;
 }
@@ -80,7 +83,7 @@ body {
     padding: 10px 16px !important;
     font-size: 0.9rem !important;
     transition: all 0.2s ease-in-out !important;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.15) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15) !important;
 }
 
 .custom-input:focus {
@@ -97,7 +100,7 @@ body {
 
 .custom-btn {
     background: linear-gradient(135deg, var(--accent-indigo), var(--accent-blue)) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     color: white !important;
     font-weight: 600 !important;
     border-radius: 8px !important;
@@ -148,7 +151,7 @@ body {
     border-radius: 4px 8px 8px 4px !important;
     color: var(--text-primary) !important;
     font-weight: 600 !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Autocomplete Floating list */
@@ -235,7 +238,9 @@ body {
     color: var(--text-primary) !important;
 }
 
-.Select-value-label, .Select-placeholder, .Select-input {
+.Select-value-label,
+.Select-placeholder,
+.Select-input {
     color: var(--text-primary) !important;
 }
 
@@ -303,4 +308,19 @@ body {
     border-radius: 6px !important;
     font-size: 0.8rem !important;
     font-weight: 500 !important;
+}
+
+/* Custom Modal Styling for Dark Theme */
+.custom-modal .modal-content {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.custom-modal .modal-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.custom-modal .modal-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
 }

@@ -26,11 +26,7 @@ def create_localization_plot(localization_data, all_transcripts):
             z=localization_data_plot.values,
             x=localization_data_plot.columns.tolist(),
             y=localization_data_plot.index.tolist(),
-            colorscale=[
-                [0.0, "#2563eb"],
-                [0.5, "#f1f5f9"],
-                [1.0, "#d32f2f"]
-            ],
+            colorscale=[[0.0, "#2563eb"], [0.5, "#f1f5f9"], [1.0, "#d32f2f"]],
             zmin=0,
             zmax=1,
             xgap=1.5,
@@ -209,18 +205,34 @@ def plot_expression_data(expression_df):
 
     tissue_types = expression_df.loc[:, "tissue_type"].unique().tolist()
 
-    nb_tissue_types = len(tissue_types)
-    rows_count = math.ceil(nb_tissue_types / 2)
-    pixels_per_row = 400
+    if len(tissue_types) == 0:
+        return []
 
-    fig = make_subplots(
-        rows=math.ceil(nb_tissue_types / 2),
-        cols=2 if nb_tissue_types > 1 else 1,
-        shared_yaxes="all",
-        subplot_titles=tissue_types,
-        vertical_spacing=120 / (rows_count * pixels_per_row),
-        horizontal_spacing=0.03,
-    )
+    # Calculate global y-axis range across all tissues to share the same y-axis scale
+    global_min = None
+    global_max = None
+    for _, row in expression_df.iterrows():
+        for lf in row["lowerfence"]:
+            if lf is not None and not pd.isna(lf):
+                if global_min is None or lf < global_min:
+                    global_min = lf
+        for uf in row["upperfence"]:
+            if uf is not None and not pd.isna(uf):
+                if global_max is None or uf > global_max:
+                    global_max = uf
+        for outliers in row["y"]:
+            for val in outliers:
+                if val is not None and not pd.isna(val):
+                    if global_min is None or val < global_min:
+                        global_min = val
+                    if global_max is None or val > global_max:
+                        global_max = val
+
+    if global_min is not None and global_max is not None:
+        y_padding = (global_max - global_min) * 0.05 if global_max != global_min else 1.0
+        y_range = [global_min - y_padding, global_max + y_padding]
+    else:
+        y_range = None
 
     # Coordinated theme-aligned high contrast colors from the reference image
     vibrant_colors = [
@@ -232,12 +244,17 @@ def plot_expression_data(expression_df):
         "#82c91e",  # Lime / Yellow-Green
     ]
 
+    figures = []
+
     for i, tissue_type in enumerate(tissue_types):
         data_for_each_tissue_type = expression_df.loc[
             (expression_df.loc[:, "tissue_type"] == tissue_type), :
         ]
         current_color = vibrant_colors[i % len(vibrant_colors)]
 
+        fig = go.Figure()
+
+        # Add Box plot
         fig.add_trace(
             go.Box(
                 x=data_for_each_tissue_type["protein"].iloc[0],
@@ -250,9 +267,7 @@ def plot_expression_data(expression_df):
                 marker_color=current_color,
                 line=dict(width=1.5, color=current_color),
                 fillcolor="rgba(0, 0, 0, 0)",
-            ),
-            row=i // 2 + 1,
-            col=i % 2 + 1,
+            )
         )
 
         proteins = data_for_each_tissue_type["protein"].iloc[0]
@@ -278,36 +293,37 @@ def plot_expression_data(expression_df):
                     opacity=0.8,
                 ),
                 showlegend=False,
-            ),
-            row=i // 2 + 1,
-            col=i % 2 + 1,
+            )
         )
 
-    # Style subplot title labels
-    for annotation in fig["layout"]["annotations"]:
-        annotation["font"] = dict(
-            size=12, color="#eceef4", family="Inter"
-        )  # Normal weight, soft gray
+        # Style individual plot layout
+        fig.update_layout(
+            title=dict(
+                text=tissue_type,
+                font=dict(size=13, color="#eceef4", family="Inter"),
+                x=0.5,
+                xanchor="center",
+            ),
+            height=380,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=50, r=20, t=50, b=50),
+            xaxis=dict(
+                tickfont=dict(color="#8f9bb3", size=10, family="Inter"),
+                showgrid=False
+            ),
+            yaxis=dict(
+                title=dict(
+                    text="log2(TPM+1)", font=dict(color="#8f9bb3", size=11, family="Inter")
+                ),
+                tickfont=dict(color="#8f9bb3", size=10, family="Inter"),
+                gridcolor="rgba(255,255,255,0.15)",
+                showgrid=True,
+                zeroline=False,
+                range=y_range,
+            )
+        )
 
-    fig.update_layout(
-        height=rows_count * pixels_per_row,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=50, r=20, t=50, b=50),
-    )
+        figures.append((tissue_type, fig))
 
-    # Standardize axes gridlines and labels
-    fig.update_xaxes(
-        tickfont=dict(color="#8f9bb3", size=10, family="Inter"), showgrid=False
-    )
-    fig.update_yaxes(
-        title=dict(
-            text="log2(TPM+1)", font=dict(color="#8f9bb3", size=11, family="Inter")
-        ),
-        tickfont=dict(color="#8f9bb3", size=10, family="Inter"),
-        gridcolor="rgba(255,255,255,0.15)",
-        showgrid=True,
-        zeroline=False,
-    )
-
-    return fig
+    return figures

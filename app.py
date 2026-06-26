@@ -120,6 +120,7 @@ app.layout = dbc.Container(
             id="checklist-store",
             data={"localization": ["all"], "topology": ["all"], "protein": None},
         ),
+        dcc.Store(id="last-selected-protein", data=None),
         header,
         dbc.Row(
             [
@@ -145,14 +146,14 @@ app.layout = dbc.Container(
     Output("protein-options", "children"),
     Output("protein-options", "style"),
     Input("protein-input", "value"),
-    State({"type": "result-item", "index": ALL}, "n_clicks"),
+    State("last-selected-protein", "data"),
 )
-def update_protein_options(value, n_clicks):
-    if value is None:
+def update_protein_options(value, last_selected):
+    if value is None or value == "":
         return [], {"display": "none"}
 
-    if n_clicks != [] and (np.array(n_clicks) != None).any():
-        return no_update, no_update
+    if value == last_selected:
+        return no_update, {"display": "none"}
 
     options = []
 
@@ -191,6 +192,7 @@ def update_protein_options(value, n_clicks):
 @app.callback(
     Output("protein-input", "value"),
     Output("protein-options", "style", allow_duplicate=True),
+    Output("last-selected-protein", "data", allow_duplicate=True),
     Output("protein-submit", "n_clicks", allow_duplicate=True),
     Input({"type": "result-item", "index": ALL}, "n_clicks"),
     State("protein-submit", "n_clicks"),
@@ -198,15 +200,15 @@ def update_protein_options(value, n_clicks):
 )
 def select_item(n_clicks, protein_submit_n_clicks):
     if not ctx.triggered:
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
 
     if (np.array(n_clicks) == None).all():
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
 
     triggered_id = ctx.triggered_id
     selected_value = triggered_id["index"]
 
-    return selected_value, {"display": "none"}, protein_submit_n_clicks + 1
+    return selected_value, {"display": "none"}, selected_value, protein_submit_n_clicks + 1
 
 
 @lru_cache(maxsize=10)
@@ -553,6 +555,35 @@ def manage_expression_page(expression_container_id, search):
                                 placeholder="Select tissue/cancer types...",
                                 className="dash-dropdown mb-3",
                                 style={"color": "#1e293b"},
+                                maxHeight=400,
+                            ),
+                            html.Br(),
+                            html.P(
+                                "Select Study Datasets:",
+                                className="mb-2 text-white",
+                                style={"fontWeight": "600"},
+                            ),
+                            dbc.Checklist(
+                                options=[
+                                    {"label": "GTEx (healthy)", "value": "GTEX"},
+                                    {"label": "TCGA (cancer)", "value": "TCGA"},
+                                ],
+                                value=["GTEX", "TCGA"],
+                                id="expression-study-filter",
+                                inline=True,
+                                switch=True,
+                                className="mb-4 text-white",
+                            ),
+                            html.P("Sort order:", className="mb-2 text-white"),
+                            dcc.Dropdown(
+                                options=[
+                                    "Alphabetical sort",
+                                    "Median expression (descending)",
+                                ],
+                                value="Alphabetical sort",
+                                id="expression-sorting-dropdown",
+                                className="dash-dropdown mb-3",
+                                style={"color": "#1e293b"},
                             ),
                             # Load button
                             dbc.Button(
@@ -568,6 +599,16 @@ def manage_expression_page(expression_container_id, search):
                             html.Div(
                                 [
                                     dbc.Button(
+                                        "Reset",
+                                        id="expression-reset-to-main-button",
+                                        className="custom-btn btn-secondary mb-4 me-2",
+                                        style={
+                                            "background": "#dc2626",
+                                            "border": "1px solid rgba(255,255,255,0.08)",
+                                            "color": "#f8fafc",
+                                        },
+                                    ),
+                                    dbc.Button(
                                         "Filter Parameters",
                                         id="expression-reset-button",
                                         className="custom-btn btn-secondary mb-4",
@@ -582,7 +623,7 @@ def manage_expression_page(expression_container_id, search):
                             ),
                             html.Div(
                                 dbc.Spinner(
-                                    children=dcc.Graph(id="expression-plot"),
+                                    children=html.Div(id="expression-plot"),
                                     size="lg",
                                     color="primary",
                                     type="border",
@@ -593,8 +634,84 @@ def manage_expression_page(expression_container_id, search):
                                 style={"position": "relative", "minHeight": "150px"},
                             ),
                         ],
-                        id="expression-container",
+                        id="expression-plot-container",
                         style={"display": "none"},
+                    ),
+                    dbc.Modal(
+                        [
+                            dbc.ModalHeader(
+                                dbc.ModalTitle("Filter & Sorting Parameters"),
+                                close_button=True,
+                            ),
+                            dbc.ModalBody(
+                                [
+                                    # 1. Select tissue/cancer types
+                                    html.P(
+                                        "Select tissue/cancer types:",
+                                        className="mb-2 text-white",
+                                        style={"fontWeight": "600"},
+                                    ),
+                                    dcc.Dropdown(
+                                        options=expression_df.loc[
+                                            :, "tissue_type"
+                                        ].unique(),
+                                        value=tissue_types_inital_value,
+                                        multi=True,
+                                        id="expression-cancer-type-dropdown-modal",
+                                        placeholder="Select tissue/cancer types...",
+                                        className="dash-dropdown mb-4",
+                                        style={"color": "#1e293b"},
+                                        maxHeight=400,
+                                    ),
+                                    # 2. Select healthy vs cancer
+                                    html.P(
+                                        "Select Study Datasets:",
+                                        className="mb-2 text-white",
+                                        style={"fontWeight": "600"},
+                                    ),
+                                    dbc.Checklist(
+                                        options=[
+                                            {
+                                                "label": "GTEx (healthy)",
+                                                "value": "GTEX",
+                                            },
+                                            {"label": "TCGA (cancer)", "value": "TCGA"},
+                                        ],
+                                        value=["GTEX", "TCGA"],
+                                        id="expression-study-filter-modal",
+                                        inline=True,
+                                        switch=True,
+                                        className="mb-4 text-white",
+                                    ),
+                                    # 3. Sort order dropdown
+                                    html.P(
+                                        "Sort order:",
+                                        className="mb-2 text-white",
+                                        style={"fontWeight": "600"},
+                                    ),
+                                    dcc.Dropdown(
+                                        options=[
+                                            "Alphabetical sort",
+                                            "Median expression (descending)",
+                                        ],
+                                        value="Alphabetical sort",
+                                        id="expression-sorting-dropdown-modal",
+                                        className="dash-dropdown mb-3",
+                                        style={"color": "#1e293b"},
+                                    ),
+                                ]
+                            ),
+                            dbc.ModalFooter(
+                                dbc.Button(
+                                    "Apply",
+                                    id="expression-modal-apply",
+                                    className="custom-btn ms-auto",
+                                )
+                            ),
+                        ],
+                        id="expression-parameters-modal",
+                        is_open=False,
+                        className="custom-modal",
                     ),
                     dcc.Store(id="expression-parameters"),
                 ],
@@ -605,28 +722,186 @@ def manage_expression_page(expression_container_id, search):
 
 
 @app.callback(
-    Output("expression-container", "style"),
+    Output("expression-plot-container", "style"),
     Output("expression-parameters-container", "style"),
-    Output("expression-parameters", "data"),
-    Output("expression-cancer-type-dropdown", "value"),
     Input("expression-load-button", "n_clicks"),
-    Input("expression-reset-button", "n_clicks"),
-    State("expression-cancer-type-dropdown", "value"),
+    Input("expression-reset-to-main-button", "n_clicks"),
     prevent_initial_call=True,
-    optional=True,
 )
-def expression_container_style(_1, _2, tissue_types):
+def toggle_expression_containers(load_clicks, reset_clicks):
     ctx = dash.callback_context
+    if not ctx.triggered:
+        return no_update, no_update
+
     trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
     if trigger_id == "expression-load-button":
-        return {"display": "block"}, {"display": "none"}, tissue_types, tissue_types
-    elif trigger_id == "expression-reset-button":
-        return (
-            {"display": "none"},
-            {"display": "block"},
-            tissue_types_inital_value,
-            tissue_types_inital_value,
+        return {"display": "block"}, {"display": "none"}
+    elif trigger_id == "expression-reset-to-main-button":
+        return {"display": "none"}, {"display": "block"}
+    return no_update, no_update
+
+
+@app.callback(
+    Output("expression-parameters", "data"),
+    Input("expression-load-button", "n_clicks"),
+    Input("expression-modal-apply", "n_clicks"),
+    Input("expression-reset-to-main-button", "n_clicks"),
+    State("expression-cancer-type-dropdown", "value"),
+    State("expression-sorting-dropdown", "value"),
+    State("expression-study-filter", "value"),
+    State("expression-cancer-type-dropdown-modal", "value"),
+    State("expression-sorting-dropdown-modal", "value"),
+    State("expression-study-filter-modal", "value"),
+    prevent_initial_call=True,
+)
+def update_parameters(
+    load_clicks,
+    apply_clicks,
+    reset_clicks,
+    initial_tissues,
+    initial_sorting,
+    initial_studies,
+    modal_tissues,
+    modal_sorting,
+    modal_studies,
+):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return no_update
+
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if trigger_id == "expression-load-button":
+        return {
+            "tissue_types": initial_tissues if initial_tissues is not None else [],
+            "sorting": initial_sorting
+            if initial_sorting is not None
+            else "Alphabetical sort",
+            "studies": initial_studies
+            if initial_studies is not None
+            else ["GTEX", "TCGA"],
+        }
+    elif trigger_id == "expression-modal-apply":
+        return {
+            "tissue_types": modal_tissues if modal_tissues is not None else [],
+            "sorting": modal_sorting
+            if modal_sorting is not None
+            else "Alphabetical sort",
+            "studies": modal_studies if modal_studies is not None else ["GTEX", "TCGA"],
+        }
+    elif trigger_id == "expression-reset-to-main-button":
+        return None
+    return no_update
+
+
+@app.callback(
+    Output("expression-parameters-modal", "is_open"),
+    Output("expression-cancer-type-dropdown-modal", "value", allow_duplicate=True),
+    Output("expression-sorting-dropdown-modal", "value"),
+    Output("expression-study-filter-modal", "value"),
+    Output("expression-cancer-type-dropdown-modal", "options", allow_duplicate=True),
+    Input("expression-reset-button", "n_clicks"),
+    Input("expression-modal-apply", "n_clicks"),
+    State("expression-parameters-modal", "is_open"),
+    State("expression-parameters", "data"),
+    State("url", "search"),
+    prevent_initial_call=True,
+)
+def toggle_modal(reset_clicks, apply_clicks, is_open, current_params, search):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return no_update, no_update, no_update, no_update, no_update
+
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if trigger_id == "expression-reset-button":
+        tissues = current_params.get("tissue_types", []) if current_params else []
+        sorting = (
+            current_params.get("sorting", "Alphabetical sort")
+            if current_params
+            else "Alphabetical sort"
         )
+        studies = (
+            current_params.get("studies", ["GTEX", "TCGA"])
+            if current_params
+            else ["GTEX", "TCGA"]
+        )
+
+        protein = get_query_data(search)
+        protein = getting_gene_names(protein.upper())
+        expression_df = get_expression_data(protein)
+        if expression_df is not None and studies:
+            upper_studies = [s.upper() for s in studies]
+            filtered_df = expression_df.loc[
+                expression_df.loc[:, "study"].str.upper().isin(upper_studies), :
+            ]
+            options = list(filtered_df.loc[:, "tissue_type"].unique())
+        else:
+            options = []
+
+        return True, tissues, sorting, studies, options
+    elif trigger_id == "expression-modal-apply":
+        return False, no_update, no_update, no_update, no_update
+
+    return is_open, no_update, no_update, no_update, no_update
+
+
+def update_tissue_dropdown_options(studies, search, current_values):
+    protein = get_query_data(search)
+    protein = getting_gene_names(protein.upper())
+    expression_df = get_expression_data(protein)
+    if expression_df is None or not studies:
+        return [], []
+
+    # Filter by study (GTEx/TCGA)
+    upper_studies = [s.upper() for s in studies]
+    filtered_df = expression_df.loc[
+        expression_df.loc[:, "study"].str.upper().isin(upper_studies), :
+    ]
+
+    options = list(filtered_df.loc[:, "tissue_type"].unique())
+
+    # Filter selected value to only retain valid options
+    valid_values = [v for v in current_values if v in options] if current_values else []
+
+    return options, valid_values
+
+
+@app.callback(
+    Output("expression-cancer-type-dropdown", "options"),
+    Output("expression-cancer-type-dropdown", "value", allow_duplicate=True),
+    Input("expression-study-filter", "value"),
+    State("url", "search"),
+    State("expression-cancer-type-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def update_main_tissue_dropdown(studies, search, current_values):
+    return update_tissue_dropdown_options(studies, search, current_values)
+
+
+@app.callback(
+    Output("expression-cancer-type-dropdown-modal", "options"),
+    Output("expression-cancer-type-dropdown-modal", "value", allow_duplicate=True),
+    Input("expression-study-filter-modal", "value"),
+    State("url", "search"),
+    State("expression-cancer-type-dropdown-modal", "value"),
+    prevent_initial_call=True,
+)
+def update_modal_tissue_dropdown(studies, search, current_values):
+    return update_tissue_dropdown_options(studies, search, current_values)
+
+
+@app.callback(
+    Output("expression-cancer-type-dropdown", "value"),
+    Output("expression-sorting-dropdown", "value"),
+    Output("expression-study-filter", "value"),
+    Input("expression-reset-to-main-button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def reset_main_page_inputs(n_clicks):
+    if n_clicks:
+        return tissue_types_inital_value, "Alphabetical sort", ["GTEX", "TCGA"]
+    return no_update, no_update, no_update
 
 
 @app.callback(
@@ -672,23 +947,25 @@ def topology_plot(search, all_transcripts):
 
 
 @app.callback(
-    Output("expression-plot", "figure"),
+    Output("expression-plot", "children"),
     Input("expression-parameters", "data"),
     State("url", "search"),
-    Input("expression-reset-button", "n_clicks"),
     prevent_initial_call=True,
     optional=True,
 )
-def update_expression_plot(parameters, search, is_clicked):
-    ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    if trigger_id == "expression-reset-button":
-        return
+def update_expression_plot(parameters, search):
+    if parameters is None:
+        return html.Div()
 
     protein = get_query_data(search)
     protein = getting_gene_names(protein.upper())
     expression_df = get_expression_data(protein)
-    tissue_types = parameters
+    if expression_df is None:
+        return html.Div()
+
+    tissue_types = parameters.get("tissue_types", [])
+    sorting = parameters.get("sorting", "Alphabetical sort")
+    studies = parameters.get("studies", ["GTEX", "TCGA"])
 
     # Filter cancer type
     if len(tissue_types) > 0:
@@ -696,11 +973,108 @@ def update_expression_plot(parameters, search, is_clicked):
             expression_df.loc[:, "tissue_type"].isin(tissue_types), :
         ]
 
-    # Generate the plot
-    fig = plot_expression_data(expression_df)
+    # Filter study (GTEx/TCGA)
+    if len(studies) > 0:
+        upper_studies = [s.upper() for s in studies]
+        expression_df = expression_df.loc[
+            expression_df.loc[:, "study"].str.upper().isin(upper_studies), :
+        ]
+    else:
+        expression_df = expression_df.iloc[0:0]
 
-    # Reset the buttons and close the popover
-    return fig
+    # Write a message if GTEX and TCGA are unselected or if no matching data is found
+    if len(studies) == 0:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Please select at least one study dataset (GTEx or TCGA) to view expression data.",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=14, color="#cbd5e1", family="Inter"),
+        )
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        )
+        return dcc.Graph(figure=fig)
+
+    if expression_df.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No expression data matches the current selection.",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=14, color="#cbd5e1", family="Inter"),
+        )
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        )
+        return dcc.Graph(figure=fig)
+
+    if sorting == "Alphabetical sort":
+        expression_df = expression_df.sort_values(by="tissue_type", ascending=True)
+    elif sorting == "Median expression (descending)":
+        expression_df["average_median"] = [
+            np.mean(medians) for medians in expression_df.loc[:, "median"]
+        ]
+        expression_df = expression_df.sort_values(by="average_median", ascending=False)
+        expression_df = expression_df.drop(columns=["average_median"])
+
+    # Generate the plots
+    tissue_figures = plot_expression_data(expression_df)
+
+    graphs = []
+    for tissue_type, fig in tissue_figures:
+        # Determine column width based on the number of transcripts in the plot
+        num_transcripts = 0
+        if fig.data and hasattr(fig.data[0], "x") and fig.data[0].x is not None:
+            num_transcripts = len(set(fig.data[0].x))
+
+        if num_transcripts <= 2:
+            md_val = 6  # 2 plots per line
+            lg_val = 3  # 4 plots per line
+            xl_val = 2  # 6 plots per line
+        elif num_transcripts <= 5:
+            md_val = 6  # 2 plots per line
+            lg_val = 4  # 3 plots per line
+            xl_val = 3  # 4 plots per line
+        elif num_transcripts <= 8:
+            md_val = 12  # 1 plot per line
+            lg_val = 6  # 2 plots per line
+            xl_val = 4  # 3 plots per line
+        elif num_transcripts <= 12:
+            md_val = 12  # 1 plot per line
+            lg_val = 12  # 1 plot per line
+            xl_val = 6  # 2 plots per line
+        else:
+            md_val = 12  # 1 plot per line
+            lg_val = 12  # 1 plot per line
+            xl_val = 12  # 1 plot per line
+
+        graphs.append(
+            dbc.Col(
+                dcc.Graph(
+                    figure=fig,
+                    config={"displayModeBar": False},
+                ),
+                xs=12,  # 1 plot per line on mobile/narrow screens
+                md=md_val,  # 1 plot per line on medium screens (not large)
+                lg=lg_val,
+                xl=xl_val,
+            )
+        )
+
+    return dbc.Row(graphs, className="g-4")
 
 
 @app.callback(
