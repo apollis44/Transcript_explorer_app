@@ -38,6 +38,13 @@ db_topology = shelve.open(
 # Sort protein options once at startup for fast binary search
 protein_options = sorted([p.upper() for p in db_names.keys()])
 
+# Load TCGA to GTEX mapping once at startup
+tsv_path = os.path.join(base_dir, "files", "TCGA_to_GTEX.tsv")
+if os.path.exists(tsv_path):
+    tcga_to_gtex_df = pd.read_csv(tsv_path, sep="\t")
+else:
+    tcga_to_gtex_df = pd.DataFrame()
+
 
 def getting_gene_names(gene_name):
     if gene_name not in db_names:
@@ -585,11 +592,26 @@ def manage_expression_page(expression_container_id, search):
                                 className="dash-dropdown mb-3",
                                 style={"color": "#1e293b"},
                             ),
-                            # Load button
-                            dbc.Button(
-                                "Load Expression Plot",
-                                id="expression-load-button",
-                                className="custom-btn w-100",
+                            # Load and Plot Cancer-Specific buttons side-by-side
+                            html.Div(
+                                [
+                                    dbc.Button(
+                                        "Load Expression Plot",
+                                        id="expression-load-button",
+                                        className="custom-btn me-2 flex-grow-1",
+                                    ),
+                                    dbc.Button(
+                                        "Auto-detect Tissues with Cancer-Specific Expression",
+                                        id="expression-cancer-specific-button",
+                                        className="custom-btn flex-grow-1",
+                                        style={
+                                            "background": "linear-gradient(135deg, #0f766e, #115e59)",
+                                            "border": "1px solid rgba(255, 255, 255, 0.1)",
+                                            "color": "#f8fafc",
+                                        },
+                                    ),
+                                ],
+                                className="d-flex w-100",
                             ),
                         ],
                         id="expression-parameters-container",
@@ -725,25 +747,95 @@ def manage_expression_page(expression_container_id, search):
     Output("expression-plot-container", "style"),
     Output("expression-parameters-container", "style"),
     Input("expression-load-button", "n_clicks"),
+    Input("expression-cancer-specific-button", "n_clicks"),
     Input("expression-reset-to-main-button", "n_clicks"),
     prevent_initial_call=True,
 )
-def toggle_expression_containers(load_clicks, reset_clicks):
+def toggle_expression_containers(load_clicks, cancer_spec_clicks, reset_clicks):
     ctx = dash.callback_context
     if not ctx.triggered:
         return no_update, no_update
 
     trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    if trigger_id == "expression-load-button":
+    if trigger_id in ["expression-load-button", "expression-cancer-specific-button"]:
         return {"display": "block"}, {"display": "none"}
     elif trigger_id == "expression-reset-to-main-button":
         return {"display": "none"}, {"display": "block"}
     return no_update, no_update
 
 
+def find_tissues_with_cancer_specific_expression(expression_df, mapping_df):
+    """
+    Finds TCGA/GTEx pairs that match the cancer-specific expression criteria:
+    - High expression of at least one transcript in the TCGA cancer cohort (median >= 2.0).
+    - No/low expression of that same transcript in all matching GTEx tissues (median <= 1.0).
+    Returns:
+        matching_tissues: list of tissue names (strings) to plot.
+    """
+    if expression_df is None or expression_df.empty or mapping_df.empty:
+        return []
+
+    # Map each TCGA cohort name to its list of matching GTEx tissue names
+    tcga_to_gtex = {}
+    for _, row in mapping_df.iterrows():
+        tcga_cohort = str(row.iloc[0]).strip()
+        gtex_tissues_str = str(row.iloc[1]).strip()
+        if pd.isna(gtex_tissues_str) or not gtex_tissues_str:
+            continue
+        gtex_list = [t.strip() for t in gtex_tissues_str.split(",") if t.strip()]
+        tcga_to_gtex[tcga_cohort] = gtex_list
+
+    # Group expression data by tissue_type for quick lookup
+    tissue_expression = {}
+    for _, row in expression_df.iterrows():
+        tissue = row["tissue_type"]
+        transcripts = row["protein"]
+        medians = row["median"]
+        tissue_expression[tissue] = {t: m for t, m in zip(transcripts, medians)}
+
+    matching_tissues = []
+
+    # Check each TCGA cohort mapping row
+    for tcga_cohort, gtex_tissues in tcga_to_gtex.items():
+        # TCGA cohort must have expression data in our protein dataset
+        if tcga_cohort not in tissue_expression:
+            continue
+
+        tcga_data = tissue_expression[tcga_cohort]
+        
+        # We check if there's at least one transcript that is:
+        # - High in TCGA (median >= 2.0)
+        # - And low in ALL of the mapped GTEx tissues that have expression data (median <= 1.0)
+        match_found = False
+        for tx, tcga_median in tcga_data.items():
+            if tcga_median >= 2.0:
+                # Check expression in all matching healthy GTEx tissues
+                all_healthy_low = True
+                for gtex_tissue in gtex_tissues:
+                    if gtex_tissue in tissue_expression:
+                        gtex_data = tissue_expression[gtex_tissue]
+                        gtex_median = gtex_data.get(tx, 0.0)
+                        if gtex_median > 1.0:
+                            all_healthy_low = False
+                            break
+                if all_healthy_low:
+                    match_found = True
+                    break
+
+        if match_found:
+            # Add TCGA cohort and all its matched GTEx tissues that are present in the expression dataset
+            matching_tissues.append(tcga_cohort)
+            for gtex_tissue in gtex_tissues:
+                if gtex_tissue in tissue_expression and gtex_tissue not in matching_tissues:
+                    matching_tissues.append(gtex_tissue)
+
+    return matching_tissues
+
+
 @app.callback(
     Output("expression-parameters", "data"),
     Input("expression-load-button", "n_clicks"),
+    Input("expression-cancer-specific-button", "n_clicks"),
     Input("expression-modal-apply", "n_clicks"),
     Input("expression-reset-to-main-button", "n_clicks"),
     State("expression-cancer-type-dropdown", "value"),
@@ -752,10 +844,12 @@ def toggle_expression_containers(load_clicks, reset_clicks):
     State("expression-cancer-type-dropdown-modal", "value"),
     State("expression-sorting-dropdown-modal", "value"),
     State("expression-study-filter-modal", "value"),
+    State("url", "search"),
     prevent_initial_call=True,
 )
 def update_parameters(
     load_clicks,
+    cancer_spec_clicks,
     apply_clicks,
     reset_clicks,
     initial_tissues,
@@ -764,6 +858,7 @@ def update_parameters(
     modal_tissues,
     modal_sorting,
     modal_studies,
+    search,
 ):
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -780,6 +875,24 @@ def update_parameters(
             "studies": initial_studies
             if initial_studies is not None
             else ["GTEX", "TCGA"],
+        }
+    elif trigger_id == "expression-cancer-specific-button":
+        protein = get_query_data(search)
+        if protein:
+            protein = getting_gene_names(protein.upper())
+            expression_df = get_expression_data(protein)
+            matched_tissues = find_tissues_with_cancer_specific_expression(expression_df, tcga_to_gtex_df)
+            if not matched_tissues:
+                matched_tissues = ["_NO_CANCER_SPECIFIC_MATCHES_"]
+        else:
+            matched_tissues = []
+
+        return {
+            "tissue_types": matched_tissues,
+            "sorting": initial_sorting
+            if initial_sorting is not None
+            else "Alphabetical sort",
+            "studies": ["GTEX", "TCGA"],
         }
     elif trigger_id == "expression-modal-apply":
         return {
@@ -816,6 +929,8 @@ def toggle_modal(reset_clicks, apply_clicks, is_open, current_params, search):
 
     if trigger_id == "expression-reset-button":
         tissues = current_params.get("tissue_types", []) if current_params else []
+        if tissues == ["_NO_CANCER_SPECIFIC_MATCHES_"]:
+            tissues = []
         sorting = (
             current_params.get("sorting", "Alphabetical sort")
             if current_params
@@ -966,6 +1081,25 @@ def update_expression_plot(parameters, search):
     tissue_types = parameters.get("tissue_types", [])
     sorting = parameters.get("sorting", "Alphabetical sort")
     studies = parameters.get("studies", ["GTEX", "TCGA"])
+
+    if tissue_types == ["_NO_CANCER_SPECIFIC_MATCHES_"]:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No cancer/healthy tissue pairs match the cancer-specific expression criteria<br>(TCGA median >= 2.0, GTEx median <= 1.0) for this protein.",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=14, color="#cbd5e1", family="Inter"),
+        )
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        )
+        return dcc.Graph(figure=fig)
 
     # Filter cancer type
     if len(tissue_types) > 0:

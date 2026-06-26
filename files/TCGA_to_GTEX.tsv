@@ -1,0 +1,34 @@
+Cohorte TCGA dans Xena (cohort)	Valeur exacte GTEx (_primary_site)
+TCGA Adrenocortical Cancer	GTEX Adrenal Gland
+TCGA Bladder Urothelial Carcinoma	GTEX Bladder
+TCGA Breast Invasive Carcinoma	GTEX Breast - Mammary Tissue
+TCGA Cervica & Endocervical Cancer	GTEX Cervix - Ectocervix,GTEX Cervix - Endocervix
+TCGA Cholangiocarcinoma	GTEX Liver
+TCGA Colon Adenocarcinoma	GTEX Colon - Sigmoid,GTEX Colon - Transverse
+TCGA Diffuse Large B-cell Lymphoma	GTEX Cells - Ebv-Transformed Lymphocytes,GTEX Whole Blood
+TCGA Esophageal Carcinoma	GTEX Esophagus - Gastroesophageal Junction,GTEX Esophagus - Mucosa,GTEX Esophagus - Muscularis
+TCGA Glioblastoma Multiforme	GTEX Brain - Amygdala,GTEX Brain - Anterior Cingulate Cortex (Ba24),GTEX Brain - Caudate (Basal Ganglia),GTEX Brain - Cerebellar Hemisphere,GTEX Brain - Cerebellum,GTEX Brain - Cortex,GTEX Brain - Frontal Cortex (Ba9),GTEX Brain - Hippocampus,GTEX Brain - Hypothalamus,GTEX Brain - Nucleus Accumbens (Basal Ganglia),GTEX Brain - Putamen (Basal Ganglia),GTEX Brain - Spinal Cord (Cervical C-1),GTEX Brain - Substantia Nigra
+TCGA Head & Neck Squamous Cell Carcinoma	GTEX Minor Salivary Gland
+TCGA Kidney Chromophobe	GTEX Kidney - Cortex
+TCGA Kidney Clear Cell Carcinoma	GTEX Kidney - Cortex
+TCGA Kidney Papillary Cell Carcinoma	GTEX Kidney - Cortex
+TCGA Acute Myeloid Leukemia	GTEX Cells - Leukemia Cell Line (Cml),GTEX Whole Blood
+TCGA Brain Lower Grade Glioma	GTEX Brain - Amygdala,GTEX Brain - Anterior Cingulate Cortex (Ba24),GTEX Brain - Caudate (Basal Ganglia),GTEX Brain - Cerebellar Hemisphere,GTEX Brain - Cerebellum,GTEX Brain - Cortex,GTEX Brain - Frontal Cortex (Ba9),GTEX Brain - Hippocampus,GTEX Brain - Hypothalamus,GTEX Brain - Nucleus Accumbens (Basal Ganglia),GTEX Brain - Putamen (Basal Ganglia),GTEX Brain - Spinal Cord (Cervical C-1),GTEX Brain - Substantia Nigra
+TCGA Liver Hepatocellular Carcinoma	GTEX Liver
+TCGA Lung Adenocarcinoma	GTEX Lung
+TCGA Lung Squamous Cell Carcinoma	GTEX Lung
+TCGA Mesothelioma	GTEX Lung
+TCGA Ovarian Serous Cystadenocarcinoma	GTEX Ovary
+TCGA Pancreatic Adenocarcinoma	GTEX Pancreas
+TCGA Pheochromocytoma and Paraganglioma	GTEX Adrenal Gland
+TCGA Prostate Adenocarcinoma	GTEX Prostate
+TCGA Rectum Adenocarcinoma	GTEX Colon - Sigmoid,GTEX Colon - Transverse
+TCGA Sarcoma	GTEX Adipose - Subcutaneous,GTEX Adipose - Visceral (Omentum),GTEX Cells - Transformed Fibroblasts,GTEX Muscle - Skeletal
+TCGA Skin Cutaneous Melanoma	GTEX Skin - Not Sun Exposed (Suprapubic),GTEX Skin - Sun Exposed (Lower Leg)
+TCGA Stomach Adenocarcinoma	GTEX Stomach
+TCGA Testicular Germ Cell Tumors	GTEX Testis
+TCGA Thyroid Carcinoma	GTEX Thyroid
+TCGA Thymoma	GTEX Whole Blood
+TCGA Uterine Corpus Endometrial Carcinoma	GTEX Uterus
+TCGA Uterine Carcinosarcoma	GTEX Uterus
+TCGA Uveal Melanoma	GTEX Skin - Not Sun Exposed (Suprapubic),GTEX Skin - Sun Exposed (Lower Leg)
